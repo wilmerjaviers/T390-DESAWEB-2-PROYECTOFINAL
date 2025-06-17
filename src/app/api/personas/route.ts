@@ -42,9 +42,14 @@ export async function POST(request: NextRequest) {
 
     const resultado = await crearPersona(personaData);
 
+    // Si crearPersona devuelve un array, toma el primer elemento
+    const insertId = Array.isArray(resultado) && resultado.length > 0 && resultado[0].insertId
+      ? resultado[0].insertId
+      : undefined;
+
     return NextResponse.json({
       success: true,
-      data: { id: resultado.insertId },
+      data: { id: insertId },
       message: 'Persona registrada exitosamente'
     });
 
