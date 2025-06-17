@@ -1,45 +1,394 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Navigation from "../../components/Navigation";
+import Chart from 'chart.js/auto';
 
+interface Estadisticas {
+  personas: { total: number; nuevas_mes: number };
+  solicitudes: { total: number; urgentes: number };
+  ayudas: { total: number; monto_total: number };
+  presupuesto: { usado_mes: number };
+}
+
+interface SolicitudData {
+  id: number;
+  urgencia: string;
+  estado: string;
+  tipo_ayuda_nombre: string;
+  monto_estimado: number;
+  fecha_solicitud: string;
+}
+
+interface AyudaData {
+  id: number;
+  tipo_ayuda_nombre: string;
+  monto_otorgado: number;
+  fecha_otorgada: string;
+  estado_entrega: string;
+}
 
 export default function Reportes() {
   const [selectedReport, setSelectedReport] = useState("mensual");
+  const [estadisticas, setEstadisticas] = useState<Estadisticas | null>(null);
+  const [solicitudes, setSolicitudes] = useState<SolicitudData[]>([]);
+  const [ayudas, setAyudas] = useState<AyudaData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
-  const reportTypes = [
-    {
-      id: "mensual",
-      icon: "bi-calendar-month",
-      title: "Reporte Mensual",
-      desc1: "Resumen mensual con",
-      desc2: "estadísticas básicas",
-      color: "primary",
-    },
-    {
-      id: "anual",
-      icon: "bi-graph-up",
-      title: "Reporte Anual",
-      desc1: "Informe completo del año",
-      desc2: "con análisis detallado",
-      color: "warning",
-    },
-    {
-      id: "personalizado",
-      icon: "bi-gear",
-      title: "Personalizado",
-      desc1: "Período específico con",
-      desc2: "filtros personalizados",
-      color: "success",
-    },
-    {
-      id: "ejecutivo",
-      icon: "bi-bar-chart",
-      title: "Ejecutivo",
-      desc1: "Vista ejecutiva con",
-      desc2: "métricas clave",
-      color: "info",
-    },
-  ];
+  // Referencias para los canvas de los gráficos
+  const chartEstadisticas = useRef<HTMLCanvasElement>(null);
+  const chartUrgencias = useRef<HTMLCanvasElement>(null);
+  const chartTiposAyuda = useRef<HTMLCanvasElement>(null);
+  const chartMontosMensuales = useRef<HTMLCanvasElement>(null);
+  const chartEstadosEntrega = useRef<HTMLCanvasElement>(null);
+
+  // Referencias para las instancias de Chart.js
+  const chartInstances = useRef<Chart[]>([]);
+
+  useEffect(() => {
+    cargarDatos();
+    return () => {
+      // Limpiar gráficos al desmontar el componente
+      chartInstances.current.forEach(chart => chart.destroy());
+    };
+  }, []);
+
+  const cargarDatos = async () => {
+    setLoading(true);
+    try {
+      const [estadisticasRes, solicitudesRes, ayudasRes] = await Promise.all([
+        fetch('/api/dashboard/estadisticas'),
+        fetch('/api/solicitudes?limite=200'),
+        fetch('/api/ayudas?limite=200')
+      ]);
+
+      const estadisticasData = await estadisticasRes.json();
+      const solicitudesData = await solicitudesRes.json();
+      const ayudasData = await ayudasRes.json();
+
+      if (estadisticasData.success) {
+        setEstadisticas(estadisticasData.data.estadisticas);
+      }
+
+      if (solicitudesData.success) {
+        setSolicitudes(solicitudesData.data);
+      }
+
+      if (ayudasData.success) {
+        setAyudas(ayudasData.data);
+      }
+
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+      setError('Error cargando datos del sistema');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (estadisticas && solicitudes.length > 0 && ayudas.length > 0) {
+      crearGraficos();
+    }
+  }, [estadisticas, solicitudes, ayudas]);
+
+  const crearGraficos = () => {
+    // Limpiar gráficos existentes
+    chartInstances.current.forEach(chart => chart.destroy());
+    chartInstances.current = [];
+
+    crearGraficoEstadisticasGenerales();
+    crearGraficoUrgencias();
+    crearGraficoTiposAyuda();
+    crearGraficoMontosMensuales();
+    crearGraficoEstadosEntrega();
+  };
+
+  const crearGraficoEstadisticasGenerales = () => {
+    if (!chartEstadisticas.current || !estadisticas) return;
+
+    const ctx = chartEstadisticas.current.getContext('2d');
+    if (!ctx) return;
+
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Personas Registradas', 'Solicitudes Pendientes', 'Ayudas Otorgadas', 'Presupuesto Usado (L)'],
+        datasets: [{
+          label: 'Estadísticas Generales',
+          data: [
+            estadisticas.personas.total,
+            estadisticas.solicitudes.total,
+            estadisticas.ayudas.total,
+            Math.round(estadisticas.presupuesto.usado_mes / 1000) // Convertir a miles
+          ],
+          backgroundColor: [
+            'rgba(59, 130, 246, 0.8)',
+            'rgba(245, 158, 11, 0.8)',
+            'rgba(16, 185, 129, 0.8)',
+            'rgba(139, 92, 246, 0.8)'
+          ],
+          borderColor: [
+            'rgba(59, 130, 246, 1)',
+            'rgba(245, 158, 11, 1)',
+            'rgba(16, 185, 129, 1)',
+            'rgba(139, 92, 246, 1)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Estadísticas Generales del Sistema'
+          },
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    chartInstances.current.push(chart);
+  };
+
+  const crearGraficoUrgencias = () => {
+    if (!chartUrgencias.current) return;
+
+    const ctx = chartUrgencias.current.getContext('2d');
+    if (!ctx) return;
+
+    // Contar solicitudes por urgencia
+    const urgenciasCount = solicitudes.reduce((acc, solicitud) => {
+      acc[solicitud.urgencia] = (acc[solicitud.urgencia] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const chart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(urgenciasCount),
+        datasets: [{
+          data: Object.values(urgenciasCount),
+          backgroundColor: [
+            'rgba(239, 68, 68, 0.8)', // Alta - Rojo
+            'rgba(245, 158, 11, 0.8)', // Media - Amarillo
+            'rgba(16, 185, 129, 0.8)'  // Baja - Verde
+          ],
+          borderColor: [
+            'rgba(239, 68, 68, 1)',
+            'rgba(245, 158, 11, 1)',
+            'rgba(16, 185, 129, 1)'
+          ],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Distribución por Urgencia'
+          },
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+
+    chartInstances.current.push(chart);
+  };
+
+  const crearGraficoTiposAyuda = () => {
+    if (!chartTiposAyuda.current) return;
+
+    const ctx = chartTiposAyuda.current.getContext('2d');
+    if (!ctx) return;
+
+    // Contar solicitudes por tipo de ayuda
+    const tiposCount = solicitudes.reduce((acc, solicitud) => {
+      acc[solicitud.tipo_ayuda_nombre] = (acc[solicitud.tipo_ayuda_nombre] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const chart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: Object.keys(tiposCount),
+        datasets: [{
+          data: Object.values(tiposCount),
+          backgroundColor: [
+            'rgba(239, 68, 68, 0.8)',   // Medicina - Rojo
+            'rgba(34, 197, 94, 0.8)',   // Alimentos - Verde
+            'rgba(59, 130, 246, 0.8)',  // Vivienda - Azul
+            'rgba(245, 158, 11, 0.8)',  // Educación - Amarillo
+            'rgba(139, 92, 246, 0.8)'   // Servicios - Púrpura
+          ],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Solicitudes por Tipo de Ayuda'
+          },
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+
+    chartInstances.current.push(chart);
+  };
+
+  const crearGraficoMontosMensuales = () => {
+    if (!chartMontosMensuales.current) return;
+
+    const ctx = chartMontosMensuales.current.getContext('2d');
+    if (!ctx) return;
+
+    // Agrupar ayudas por mes
+    const montosPorMes = ayudas.reduce((acc, ayuda) => {
+      const fecha = new Date(ayuda.fecha_otorgada);
+      const mes = fecha.toLocaleDateString('es-HN', { month: 'short', year: 'numeric' });
+      acc[mes] = (acc[mes] || 0) + ayuda.monto_otorgado;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Object.keys(montosPorMes),
+        datasets: [{
+          label: 'Monto Otorgado (L)',
+          data: Object.values(montosPorMes),
+          borderColor: 'rgba(16, 185, 129, 1)',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Evolución de Montos Otorgados por Mes'
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return 'L ' + value.toLocaleString();
+              }
+            }
+          }
+        }
+      }
+    });
+
+    chartInstances.current.push(chart);
+  };
+
+  const crearGraficoEstadosEntrega = () => {
+    if (!chartEstadosEntrega.current) return;
+
+    const ctx = chartEstadosEntrega.current.getContext('2d');
+    if (!ctx) return;
+
+    // Contar ayudas por estado de entrega
+    const estadosCount = ayudas.reduce((acc, ayuda) => {
+      acc[ayuda.estado_entrega] = (acc[ayuda.estado_entrega] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(estadosCount),
+        datasets: [{
+          label: 'Cantidad de Ayudas',
+          data: Object.values(estadosCount),
+          backgroundColor: [
+            'rgba(245, 158, 11, 0.8)', // Programada - Amarillo
+            'rgba(16, 185, 129, 0.8)', // Entregada - Verde
+            'rgba(239, 68, 68, 0.8)'   // Cancelada - Rojo
+          ],
+          borderColor: [
+            'rgba(245, 158, 11, 1)',
+            'rgba(16, 185, 129, 1)',
+            'rgba(239, 68, 68, 1)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Estados de Entrega de Ayudas'
+          },
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    chartInstances.current.push(chart);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-vh-100 bg-light">
+        <Navigation activeSection="reportes" />
+        <div className="container py-4">
+          <div className="d-flex justify-content-center align-items-center" style={{minHeight: '400px'}}>
+            <div className="text-center">
+              <div className="spinner-border text-primary mb-3" role="status">
+                <span className="visually-hidden">Cargando...</span>
+              </div>
+              <p className="text-muted">Cargando reportes y gráficos...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-vh-100 bg-light">
+        <Navigation activeSection="reportes" />
+        <div className="container py-4">
+          <div className="alert alert-danger" role="alert">
+            <i className="bi bi-exclamation-triangle me-2"></i>
+            {error}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-vh-100 bg-light">
@@ -67,9 +416,6 @@ export default function Reportes() {
                   <i className="bi bi-graph-up me-2"></i>
                   Reportes y Estadísticas
                 </h1>
-                <p className="lead text-muted">
-                  Genere informes detallados y análisis de datos
-                </p>
               </div>
             </div>
           </div>
@@ -83,322 +429,74 @@ export default function Reportes() {
           </div>
         </div>
 
-        <div className="row g-4">
-          {/* Configuración del Reporte */}
-          <div className="col-lg-8">
-            {/* Selección de Tipo de Reporte */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-primary text-white">
-                <h5 className="card-title mb-0">
-                  <i className="bi bi-clipboard-data me-2"></i>Seleccionar Tipo de Reporte
-                </h5>
-              </div>
+        {/* Gráficos */}
+        <div className="row g-4 mb-4">
+          {/* Primera fila de gráficos */}
+          <div className="col-lg-6">
+            <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
-                <div className="row g-3">
-                  {reportTypes.map((report) => (
-                    <div key={report.id} className="col-md-6">
-                      <div
-                        className={`card h-100 border-${report.color} ${selectedReport === report.id ? `bg-${report.color} bg-opacity-10` : ''} cursor-pointer`}
-                        onClick={() => setSelectedReport(report.id)}
-                        style={{cursor: 'pointer', transition: 'all 0.2s'}}
-                      >
-                        <div className="card-body text-center">
-                          <i className={`${report.icon} text-${report.color} mb-2`} style={{fontSize: '2.5rem'}}></i>
-                          <h6 className={`card-title text-${report.color}`}>{report.title}</h6>
-                          <p className="card-text text-muted small mb-1">{report.desc1}</p>
-                          <p className="card-text text-muted small">{report.desc2}</p>
-                          {selectedReport === report.id && (
-                            <div className={`badge bg-${report.color} bg-opacity-25 text-${report.color} mt-2`}>
-                              <i className="bi bi-check-circle-fill me-1"></i>Seleccionado
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Configuración de Parámetros */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-info text-white">
-                <h5 className="card-title mb-0">
-                  <i className="bi bi-calendar-range me-2"></i>Configuración del Reporte
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="row g-3 mb-4">
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">
-                      <i className="bi bi-calendar-date me-1"></i>Fecha Desde
-                    </label>
-                    <input type="date" className="form-control form-control-lg" defaultValue="2024-01-01" />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">
-                      <i className="bi bi-calendar-check me-1"></i>Fecha Hasta
-                    </label>
-                    <input type="date" className="form-control form-control-lg" defaultValue="2024-01-31" />
-                  </div>
-                </div>
-
-                <div className="row g-3 mb-4">
-                  <div className="col-md-4">
-                    <label className="form-label fw-semibold">
-                      <i className="bi bi-tags me-1"></i>Tipo de Ayuda
-                    </label>
-                    <select className="form-select form-select-lg" defaultValue="Todas las categorías">
-                      <option>Todas las categorías</option>
-                      <option>Medicina</option>
-                      <option>Alimentos</option>
-                      <option>Vivienda</option>
-                      <option>Educación</option>
-                    </select>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label fw-semibold">
-                      <i className="bi bi-flag me-1"></i>Prioridad
-                    </label>
-                    <select className="form-select form-select-lg" defaultValue="Todas">
-                      <option>Todas</option>
-                      <option>Alta</option>
-                      <option>Media</option>
-                      <option>Baja</option>
-                    </select>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label fw-semibold">
-                      <i className="bi bi-check-circle me-1"></i>Estado
-                    </label>
-                    <select className="form-select form-select-lg" defaultValue="Todos">
-                      <option>Todos</option>
-                      <option>Pendiente</option>
-                      <option>Aprobado</option>
-                      <option>Rechazado</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="row g-3 mb-4">
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">
-                      <i className="bi bi-currency-dollar me-1"></i>Monto Mínimo (Lempiras)
-                    </label>
-                    <div className="input-group input-group-lg">
-                      <span className="input-group-text">L</span>
-                      <input type="number" className="form-control" placeholder="0" />
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">
-                      <i className="bi bi-currency-dollar me-1"></i>Monto Máximo (Lempiras)
-                    </label>
-                    <div className="input-group input-group-lg">
-                      <span className="input-group-text">L</span>
-                      <input type="number" className="form-control" placeholder="50,000" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <label className="form-label fw-semibold">
-                    <i className="bi bi-file-earmark me-1"></i>Formato de Salida
-                  </label>
-                  <div className="d-flex gap-3 mt-2">
-                    <button className="btn btn-danger btn-lg">
-                      <i className="bi bi-file-earmark-pdf me-2"></i>PDF
-                    </button>
-                    <button className="btn btn-success btn-lg">
-                      <i className="bi bi-file-earmark-excel me-2"></i>Excel
-                    </button>
-                    <button className="btn btn-info btn-lg">
-                      <i className="bi bi-filetype-csv me-2"></i>CSV
-                    </button>
-                  </div>
-                </div>
-
-                <div className="d-flex gap-3">
-                  <button className="btn btn-primary btn-lg">
-                    <i className="bi bi-download me-2"></i>Generar Reporte
-                  </button>
-                  <button className="btn btn-outline-secondary btn-lg">
-                    <i className="bi bi-arrow-clockwise me-2"></i>Limpiar
-                  </button>
-                </div>
+                <canvas ref={chartEstadisticas} style={{maxHeight: '400px'}}></canvas>
               </div>
             </div>
           </div>
-
-          {/* Panel Lateral - Ayudas Recientes y Estadísticas */}
-          <div className="col-lg-4">
-            {/* Ayudas Recientes */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-success text-white">
-                <h6 className="card-title mb-0">
-                  <i className="bi bi-hand-thumbs-up me-2"></i>Ayudas Recientes
-                </h6>
-              </div>
+          <div className="col-lg-6">
+            <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
-                <div className="list-group list-group-flush">
-                  <div className="list-group-item px-0 border-0">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="me-auto">
-                        <strong className="mb-1">Juan Pérez</strong>
-                        <p className="mb-1 small text-muted">recibió apoyo para medicamentos.</p>
-                        <small className="text-muted">
-                          <i className="bi bi-calendar me-1"></i>01/05/2024
-                        </small>
-                      </div>
-                      <span className="badge bg-primary rounded-pill">L 1,500</span>
-                    </div>
-                  </div>
-                  
-                  <div className="list-group-item px-0 border-0">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="me-auto">
-                        <strong className="mb-1">María Gómez</strong>
-                        <p className="mb-1 small text-muted">apoyo para alimentos básicos.</p>
-                        <small className="text-muted">
-                          <i className="bi bi-calendar me-1"></i>03/05/2024
-                        </small>
-                      </div>
-                      <span className="badge bg-success rounded-pill">L 2,000</span>
-                    </div>
-                  </div>
-                  
-                  <div className="list-group-item px-0 border-0">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="me-auto">
-                        <strong className="mb-1">Carlos Ruiz</strong>
-                        <p className="mb-1 small text-muted">recibió ayuda para vivienda temporal.</p>
-                        <small className="text-muted">
-                          <i className="bi bi-calendar me-1"></i>05/05/2024
-                        </small>
-                      </div>
-                      <span className="badge bg-warning rounded-pill">L 5,000</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Estadísticas Rápidas */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-secondary text-white">
-                <h6 className="card-title mb-0">
-                  <i className="bi bi-bar-chart me-2"></i>Estadísticas del Mes
-                </h6>
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-6">
-                    <div className="bg-primary bg-opacity-10 rounded p-3 text-center">
-                      <i className="bi bi-people text-primary" style={{fontSize: '1.5rem'}}></i>
-                      <div className="fw-bold text-primary mt-1">156</div>
-                      <small className="text-muted">Personas Atendidas</small>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="bg-success bg-opacity-10 rounded p-3 text-center">
-                      <i className="bi bi-hand-thumbs-up text-success" style={{fontSize: '1.5rem'}}></i>
-                      <div className="fw-bold text-success mt-1">89</div>
-                      <small className="text-muted">Ayudas Otorgadas</small>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="bg-warning bg-opacity-10 rounded p-3 text-center">
-                      <i className="bi bi-clock text-warning" style={{fontSize: '1.5rem'}}></i>
-                      <div className="fw-bold text-warning mt-1">23</div>
-                      <small className="text-muted">Pendientes</small>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="bg-info bg-opacity-10 rounded p-3 text-center">
-                      <i className="bi bi-currency-dollar text-info" style={{fontSize: '1.5rem'}}></i>
-                      <div className="fw-bold text-info mt-1">L 45K</div>
-                      <small className="text-muted">Total Invertido</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Gráfico de Progreso */}
-            <div className="card border-0 shadow-sm">
-              <div className="card-header bg-dark text-white">
-                <h6 className="card-title mb-0">
-                  <i className="bi bi-pie-chart me-2"></i>Distribución por Tipo
-                </h6>
-              </div>
-              <div className="card-body">
-                <div className="mb-3">
-                  <div className="d-flex justify-content-between mb-1">
-                    <span className="small">Medicina</span>
-                    <span className="small">40%</span>
-                  </div>
-                  <div className="progress" style={{height: '8px'}}>
-                    <div className="progress-bar bg-danger" style={{width: '40%'}}></div>
-                  </div>
-                </div>
-                
-                <div className="mb-3">
-                  <div className="d-flex justify-content-between mb-1">
-                    <span className="small">Alimentos</span>
-                    <span className="small">30%</span>
-                  </div>
-                  <div className="progress" style={{height: '8px'}}>
-                    <div className="progress-bar bg-success" style={{width: '30%'}}></div>
-                  </div>
-                </div>
-                
-                <div className="mb-3">
-                  <div className="d-flex justify-content-between mb-1">
-                    <span className="small">Vivienda</span>
-                    <span className="small">20%</span>
-                  </div>
-                  <div className="progress" style={{height: '8px'}}>
-                    <div className="progress-bar bg-warning" style={{width: '20%'}}></div>
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span className="small">Educación</span>
-                    <span className="small">10%</span>
-                  </div>
-                  <div className="progress" style={{height: '8px'}}>
-                    <div className="progress-bar bg-info" style={{width: '10%'}}></div>
-                  </div>
-                </div>
+                <canvas ref={chartUrgencias} style={{maxHeight: '400px'}}></canvas>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Vista Previa del Reporte */}
-        <div className="row mt-4">
-          <div className="col-12">
-            <div className="card border-0 shadow-sm">
-              <div className="card-header bg-light">
-                <h5 className="card-title mb-0">
-                  <i className="bi bi-eye me-2"></i>Vista Previa del Reporte - {reportTypes.find(r => r.id === selectedReport)?.title}
-                </h5>
-              </div>
+        <div className="row g-4 mb-4">
+          {/* Segunda fila de gráficos */}
+          <div className="col-lg-6">
+            <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
-                <div className="text-center py-5 text-muted">
-                  <i className="bi bi-file-earmark-text" style={{fontSize: '4rem'}}></i>
-                  <h5 className="mt-3">Vista Previa del Reporte</h5>
-                  <p className="mb-3">Configure los parámetros y haga clic en "Generar Reporte" para ver una vista previa</p>
-                  <div className="d-flex justify-content-center gap-2">
-                    <span className="badge bg-primary">Datos en tiempo real</span>
-                    <span className="badge bg-success">Exportable</span>
-                    <span className="badge bg-info">Personalizable</span>
-                  </div>
-                </div>
+                <canvas ref={chartTiposAyuda} style={{maxHeight: '400px'}}></canvas>
               </div>
             </div>
           </div>
+          <div className="col-lg-6">
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-body">
+                <canvas ref={chartEstadosEntrega} style={{maxHeight: '400px'}}></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="row g-4 mb-4">
+          
+         
+        </div>
+
+        <div className="row g-4">
+          {/* Configuración del Reporte */}
+          <div className="col-lg-8">
+            {/* Contenido existente si lo hay */}
+          </div>
+        </div>
+
+        {/* Botón de actualización */}
+        <div className="text-center mt-4">
+          <button 
+            onClick={cargarDatos}
+            className="btn btn-primary btn-lg"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                Actualizando...
+              </>
+            ) : (
+              <>
+                <i className="bi bi-arrow-clockwise me-2"></i>
+                Actualizar Datos
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -409,6 +507,16 @@ export default function Reportes() {
         .cursor-pointer:hover {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        }
+        
+        /* Asegurar que los canvas se ajusten correctamente */
+        canvas {
+          max-width: 100% !important;
+          height: auto !important;
+        }
+        
+        .card-body canvas {
+          width: 100% !important;
         }
       `}</style>
     </div>
