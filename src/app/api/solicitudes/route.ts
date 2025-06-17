@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { id: resultado.insertId },
+      data: { id: resultado[0]?.insertId },
       message: 'Solicitud creada exitosamente'
     });
 
