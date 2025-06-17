@@ -53,9 +53,10 @@ export async function POST(request: NextRequest) {
       'Ayuda otorgada'
     );
 
+    // Suponiendo que el ID insertado está en resultado[0].insertId
     return NextResponse.json({
       success: true,
-      data: { id: resultado.insertId },
+      data: { id: resultado[0]?.insertId },
       message: 'Ayuda otorgada exitosamente'
     });
 
