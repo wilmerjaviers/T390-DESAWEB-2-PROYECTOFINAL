@@ -61,10 +61,10 @@ export default function RegistroPersonas() {
   ];
 
   const departamentos = [
-    'Francisco Morazán', 'Cortés', 'Atlántida', 'Choluteca', 'El Paraíso',
-    'Yoro', 'Olancho', 'Colón', 'Comayagua', 'Santa Bárbara',
-    'Lempira', 'Copán', 'Intibucá', 'La Paz', 'Valle',
-    'Ocotepeque', 'Gracias a Dios', 'Islas de la Bahía'
+    'Francisco Morazán', 'Cortés', 'Atlántida'//, 'Choluteca', 'El Paraíso',
+    //'Yoro', 'Olancho', 'Colón', 'Comayagua', 'Santa Bárbara',
+    //'Lempira', 'Copán', 'Intibucá', 'La Paz', 'Valle',
+    //'Ocotepeque', 'Gracias a Dios', 'Islas de la Bahía'
   ];
 
   const municipiosPorDepartamento: {[key: string]: string[]} = {
