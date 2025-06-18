@@ -252,7 +252,7 @@ export default function Dashboard() {
                     className="btn btn-outline-primary"
                     onClick={() => window.location.href = '/reportes'}
                   >
-                    <i className="bi bi-eye me-2"></i>Ver Todas las Actividades
+                    <i className="bi bi-eye me-2"></i>Ver Reportes y Personas
                   </button>
                 </div>
               </div>
@@ -308,7 +308,7 @@ export default function Dashboard() {
                         <div className="fw-bold text-primary">
                           {estadisticas?.personas.total || 0}
                         </div>
-                        <small className="text-muted">Total Personas</small>
+                        <small className="text-muted">Total Personas Registradas</small>
                       </div>
                     </div>
                     <div className="col-6">
@@ -316,7 +316,7 @@ export default function Dashboard() {
                         <div className="fw-bold text-warning">
                           {estadisticas?.solicitudes.total || 0}
                         </div>
-                        <small className="text-muted">Pendientes</small>
+                        <small className="text-muted">Solicitudes Pendientes</small>
                       </div>
                     </div>
                   </div>
