@@ -620,33 +620,29 @@ export default function Reportes() {
               </div>
               
               {/* Footer con estadísticas rápidas */}
+
               {personas.length > 0 && (
                 <div className="card-footer bg-light">
                   <div className="row text-center">
-                    <div className="col-md-3">
+                    <div className="col-md-4">
                       <div className="text-primary fw-bold">
                         {personas.filter(p => p.nivel_prioridad === 'high').length}
                       </div>
                       <small className="text-muted">Alta Prioridad</small>
                     </div>
-                    <div className="col-md-3">
+                    <div className="col-md-4">
                       <div className="text-warning fw-bold">
                         {personas.filter(p => p.nivel_prioridad === 'medium').length}
                       </div>
                       <small className="text-muted">Media Prioridad</small>
                     </div>
-                    <div className="col-md-3">
+                    <div className="col-md-4">
                       <div className="text-success fw-bold">
                         {personas.filter(p => p.nivel_prioridad === 'low').length}
                       </div>
                       <small className="text-muted">Baja Prioridad</small>
                     </div>
-                    <div className="col-md-3">
-                      <div className="text-info fw-bold">
-                        {personas.filter(p => p.telefono && p.telefono.trim() !== '').length}
-                      </div>
-                      <small className="text-muted">Con Teléfono</small>
-                    </div>
+                   
                   </div>
                 </div>
               )}
