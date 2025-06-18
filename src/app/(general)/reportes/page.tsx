@@ -27,11 +27,25 @@ interface AyudaData {
   estado_entrega: string;
 }
 
+// Nueva interfaz para personas
+interface PersonaData {
+  id: number;
+  nombre_completo: string;
+  cedula: string;
+  genero: string;
+  telefono: string;
+  departamento: string;
+  municipio: string;
+  nivel_prioridad: string;
+  fecha_registro: string;
+}
+
 export default function Reportes() {
   const [selectedReport, setSelectedReport] = useState("mensual");
   const [estadisticas, setEstadisticas] = useState<Estadisticas | null>(null);
   const [solicitudes, setSolicitudes] = useState<SolicitudData[]>([]);
   const [ayudas, setAyudas] = useState<AyudaData[]>([]);
+  const [personas, setPersonas] = useState<PersonaData[]>([]); // Nueva estado
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
 
@@ -56,15 +70,17 @@ export default function Reportes() {
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      const [estadisticasRes, solicitudesRes, ayudasRes] = await Promise.all([
+      const [estadisticasRes, solicitudesRes, ayudasRes, personasRes] = await Promise.all([
         fetch('/api/dashboard/estadisticas'),
         fetch('/api/solicitudes?limite=200'),
-        fetch('/api/ayudas?limite=200')
+        fetch('/api/ayudas?limite=200'),
+        fetch('/api/personas?limite=100') // Nueva llamada para personas
       ]);
 
       const estadisticasData = await estadisticasRes.json();
       const solicitudesData = await solicitudesRes.json();
       const ayudasData = await ayudasRes.json();
+      const personasData = await personasRes.json(); // Nueva data
 
       if (estadisticasData.success) {
         setEstadisticas(estadisticasData.data.estadisticas);
@@ -76,6 +92,10 @@ export default function Reportes() {
 
       if (ayudasData.success) {
         setAyudas(ayudasData.data);
+      }
+
+      if (personasData.success) {
+        setPersonas(personasData.data);
       }
 
     } catch (error) {
@@ -358,6 +378,33 @@ export default function Reportes() {
     chartInstances.current.push(chart);
   };
 
+  // Función para obtener información de prioridad
+  const getPrioridadInfo = (prioridad: string) => {
+    const prioridades = {
+      'high': { color: 'danger', texto: 'ALTA', icon: 'bi-exclamation-triangle-fill' },
+      'medium': { color: 'warning', texto: 'MEDIA', icon: 'bi-dash-circle-fill' },
+      'low': { color: 'success', texto: 'BAJA', icon: 'bi-check-circle-fill' }
+    };
+    return prioridades[prioridad as keyof typeof prioridades] || prioridades.medium;
+  };
+
+  // Función para formatear fecha
+  const formatearFecha = (fecha: string) => {
+    return new Date(fecha).toLocaleDateString('es-HN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Función para formatear cédula
+  const formatearCedula = (cedula: string) => {
+    if (cedula.length >= 4) {
+      return `${cedula.slice(0, 4)}-${cedula.slice(4, 8)}-${cedula.slice(8, 13)}`;
+    }
+    return cedula;
+  };
+
   if (loading) {
     return (
       <div className="min-vh-100 bg-light">
@@ -466,15 +513,137 @@ export default function Reportes() {
           </div>
         </div>
 
+        {/* NUEVA SECCIÓN: Tabla de Personas Registradas */}
         <div className="row g-4 mb-4">
-          
-         
-        </div>
-
-        <div className="row g-4">
-          {/* Configuración del Reporte */}
-          <div className="col-lg-8">
-            {/* Contenido existente si lo hay */}
+          <div className="col-12">
+            <div className="card border-0 shadow-sm">
+              <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">
+                  <i className="bi bi-people-fill me-2"></i>
+                  Personas Registradas Actualmente
+                </h5>
+                <span className="badge bg-white text-primary">
+                  Total: {personas.length}
+                </span>
+              </div>
+              <div className="card-body">
+                {personas.length > 0 ? (
+                  <div className="table-responsive">
+                    <table className="table table-hover table-striped">
+                      <thead className="table-dark">
+                        <tr>
+                          <th scope="col">#</th>
+                          <th scope="col">Nombre Completo</th>
+                          <th scope="col">Cédula</th>
+                          <th scope="col">Género</th>
+                          <th scope="col">Teléfono</th>
+                          <th scope="col">Ubicación</th>
+                          <th scope="col">Prioridad</th>
+                          <th scope="col">Fecha Registro</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {personas.map((persona, index) => {
+                          const prioridadInfo = getPrioridadInfo(persona.nivel_prioridad);
+                          return (
+                            <tr key={persona.id}>
+                              <th scope="row">{index + 1}</th>
+                              <td>
+                                <div className="fw-semibold">{persona.nombre_completo}</div>
+                              </td>
+                              <td>
+                                <code className="text-muted">
+                                  {formatearCedula(persona.cedula)}
+                                </code>
+                              </td>
+                              <td>
+                                <span className={`badge ${persona.genero === 'Masculino' ? 'bg-info' : 'bg-pink'} bg-opacity-25 text-dark`}>
+                                  <i className={`bi ${persona.genero === 'Masculino' ? 'bi-person' : 'bi-person-dress'} me-1`}></i>
+                                  {persona.genero}
+                                </span>
+                              </td>
+                              <td>
+                                {persona.telefono ? (
+                                  <span className="text-success">
+                                    <i className="bi bi-telephone me-1"></i>
+                                    {persona.telefono}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted">
+                                    <i className="bi bi-telephone-x me-1"></i>
+                                    No disponible
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <small className="text-muted">
+                                  <i className="bi bi-geo-alt me-1"></i>
+                                  {persona.municipio}, {persona.departamento}
+                                </small>
+                              </td>
+                              <td>
+                                <span className={`badge bg-${prioridadInfo.color}`}>
+                                  <i className={`${prioridadInfo.icon} me-1`}></i>
+                                  {prioridadInfo.texto}
+                                </span>
+                              </td>
+                              <td>
+                                <small className="text-muted">
+                                  <i className="bi bi-calendar me-1"></i>
+                                  {formatearFecha(persona.fecha_registro)}
+                                </small>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-5">
+                    <i className="bi bi-people text-muted" style={{fontSize: '4rem'}}></i>
+                    <h5 className="text-muted mt-3">No hay personas registradas</h5>
+                    <p className="text-muted">Las personas registradas aparecerán aquí</p>
+                    <a href="/fichaRegistro" className="btn btn-primary">
+                      <i className="bi bi-person-plus me-2"></i>
+                      Registrar Nueva Persona
+                    </a>
+                  </div>
+                )}
+              </div>
+              
+              {/* Footer con estadísticas rápidas */}
+              {personas.length > 0 && (
+                <div className="card-footer bg-light">
+                  <div className="row text-center">
+                    <div className="col-md-3">
+                      <div className="text-primary fw-bold">
+                        {personas.filter(p => p.nivel_prioridad === 'high').length}
+                      </div>
+                      <small className="text-muted">Alta Prioridad</small>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="text-warning fw-bold">
+                        {personas.filter(p => p.nivel_prioridad === 'medium').length}
+                      </div>
+                      <small className="text-muted">Media Prioridad</small>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="text-success fw-bold">
+                        {personas.filter(p => p.nivel_prioridad === 'low').length}
+                      </div>
+                      <small className="text-muted">Baja Prioridad</small>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="text-info fw-bold">
+                        {personas.filter(p => p.telefono && p.telefono.trim() !== '').length}
+                      </div>
+                      <small className="text-muted">Con Teléfono</small>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -517,6 +686,26 @@ export default function Reportes() {
         
         .card-body canvas {
           width: 100% !important;
+        }
+
+        /* Estilos para la tabla */
+        .table-responsive {
+          max-height: 600px;
+          overflow-y: auto;
+        }
+        
+        .bg-pink {
+          background-color: #f8d7da !important;
+        }
+        
+        /* Zebra stripes mejoradas */
+        .table-striped > tbody > tr:nth-of-type(odd) > td {
+          background-color: rgba(102, 126, 234, 0.05);
+        }
+        
+        /* Hover mejorado */
+        .table-hover > tbody > tr:hover > td {
+          background-color: rgba(102, 126, 234, 0.1);
         }
       `}</style>
     </div>
