@@ -45,7 +45,7 @@ export default function Reportes() {
   const [estadisticas, setEstadisticas] = useState<Estadisticas | null>(null);
   const [solicitudes, setSolicitudes] = useState<SolicitudData[]>([]);
   const [ayudas, setAyudas] = useState<AyudaData[]>([]);
-  const [personas, setPersonas] = useState<PersonaData[]>([]); // Nueva estado
+  const [personas, setPersonas] = useState<PersonaData[]>([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
 
@@ -62,7 +62,7 @@ export default function Reportes() {
   useEffect(() => {
     cargarDatos();
     return () => {
-      // Limpiar gráficos al desmontar el componente
+      // Limpiar gráficos 
       chartInstances.current.forEach(chart => chart.destroy());
     };
   }, []);
@@ -74,13 +74,13 @@ export default function Reportes() {
         fetch('/api/dashboard/estadisticas'),
         fetch('/api/solicitudes?limite=200'),
         fetch('/api/ayudas?limite=200'),
-        fetch('/api/personas?limite=100') // Nueva llamada para personas
+        fetch('/api/personas?limite=100') 
       ]);
 
       const estadisticasData = await estadisticasRes.json();
       const solicitudesData = await solicitudesRes.json();
       const ayudasData = await ayudasRes.json();
-      const personasData = await personasRes.json(); // Nueva data
+      const personasData = await personasRes.json();
 
       if (estadisticasData.success) {
         setEstadisticas(estadisticasData.data.estadisticas);
@@ -113,7 +113,7 @@ export default function Reportes() {
   }, [estadisticas, solicitudes, ayudas]);
 
   const crearGraficos = () => {
-    // Limpiar gráficos existentes
+    // Limpiar gráficos
     chartInstances.current.forEach(chart => chart.destroy());
     chartInstances.current = [];
 
@@ -442,7 +442,7 @@ export default function Reportes() {
       <Navigation activeSection="reportes" />
 
       <div className="container py-4">
-        {/* Breadcrumb */}
+        
         <nav aria-label="breadcrumb" className="mb-4">
           <ol className="breadcrumb">
             <li className="breadcrumb-item">
@@ -454,7 +454,7 @@ export default function Reportes() {
           </ol>
         </nav>
 
-        {/* Header */}
+       
         <div className="row mb-4">
           <div className="col-12">
             <div className="card border-0 shadow-sm">
@@ -477,8 +477,11 @@ export default function Reportes() {
         </div>
 
         {/* Gráficos */}
+        
         <div className="row g-4 mb-4">
+
           {/* Primera fila de gráficos */}
+
           <div className="col-lg-6">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
@@ -496,7 +499,10 @@ export default function Reportes() {
         </div>
 
         <div className="row g-4 mb-4">
+
+
           {/* Segunda fila de gráficos */}
+
           <div className="col-lg-6">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
@@ -513,7 +519,8 @@ export default function Reportes() {
           </div>
         </div>
 
-        {/* NUEVA SECCIÓN: Tabla de Personas Registradas */}
+        {/*Tabla de Personas Registradas*/}
+        
         <div className="row g-4 mb-4">
           <div className="col-12">
             <div className="card border-0 shadow-sm">
